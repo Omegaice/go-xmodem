@@ -1,25 +1,27 @@
-package main
+package xmodem
 
-import "testing"
+import (
+	"log"
+	"testing"
 
-func TestCRC16(t *testing.T) {
-	data := []byte{72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100}
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
 
-	var expected uint16 = 39210
-	var actual uint16 = CRC16(data)
-
-	if actual != expected {
-		t.Fatalf("Expected %d Actual %d\n", expected, actual)
-	}
+func TestXModem(t *testing.T) {
+	log.SetOutput(GinkgoWriter)
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "XMODEM")
 }
 
-func TestCRC16Constant(t *testing.T) {
-	data := []byte{72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100}
+var _ = Describe("XMODEM", func() {
+	It("should calculate the CRC16 correctly", func() {
+		data := []byte{72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100}
+		Ω(CRC16(data)).Should(Equal(uint16(39210)))
+	})
 
-	var expected uint16 = 43803
-	var actual uint16 = CRC16Constant(data, 13)
-
-	if actual != expected {
-		t.Fatalf("Expected %d Actual %d\n", expected, actual)
-	}
-}
+	It("should calculate the CRC16 with a constant correclty", func() {
+		data := []byte{72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100}
+		Ω(CRC16Constant(data, 13)).Should(Equal(uint16(43803)))
+	})
+})
