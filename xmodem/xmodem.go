@@ -242,14 +242,5 @@ func ModemReceive(c io.ReadWriter) ([]byte, error) {
 		}
 	}
 
-	// Find EOT
-	index := 0
-	for i := 0; i < data.Len(); i++ {
-		if data.Bytes()[i] == EOT {
-			index = i
-			break
-		}
-	}
-
-	return data.Bytes()[0:index], nil
+	return data.Bytes(), nil
 }
