@@ -65,22 +65,26 @@ func CRC16Constant(data []byte, length int) uint16 {
 	return u16CRC
 }
 
-func sendBlock(c io.ReadWriter, block uint8, data []byte) error {
-	//send STX
-	if _, err := c.Write([]byte{STX}); err != nil {
+func sendBlock(c io.ReadWriter, block int, data []byte, packetPayloadLen int) error {
+	startByte := SOH
+	if packetPayloadLen == LONG_PACKET_PAYLOAD_LEN {
+		startByte = STX
+	}
+	// send start byte
+	if _, err := c.Write([]byte{startByte}); err != nil {
 		return err
 	}
-	if _, err := c.Write([]byte{block}); err != nil {
+	if _, err := c.Write([]byte{uint8(block % 256)}); err != nil {
 		return err
 	}
-	if _, err := c.Write([]byte{255 - block}); err != nil {
+	if _, err := c.Write([]byte{uint8(255 - (block % 256))}); err != nil {
 		return err
 	}
 
 	//send data
 	var toSend bytes.Buffer
 	toSend.Write(data)
-	for toSend.Len() < LONG_PACKET_PAYLOAD_LEN {
+	for toSend.Len() < packetPayloadLen {
 		toSend.Write([]byte{EOT})
 	}
 
@@ -94,7 +98,7 @@ func sendBlock(c io.ReadWriter, block uint8, data []byte) error {
 	}
 
 	//calc CRC
-	u16CRC := CRC16Constant(data, LONG_PACKET_PAYLOAD_LEN)
+	u16CRC := CRC16Constant(data, packetPayloadLen)
 
 	//send CRC
 	if _, err := c.Write([]byte{uint8(u16CRC >> 8)}); err != nil {
@@ -108,6 +112,14 @@ func sendBlock(c io.ReadWriter, block uint8, data []byte) error {
 }
 
 func ModemSend(c io.ReadWriter, data []byte) error {
+	return modemSend(c, data, SHORT_PACKET_PAYLOAD_LEN)
+}
+
+func ModemSend1K(c io.ReadWriter, data []byte) error {
+	return modemSend(c, data, LONG_PACKET_PAYLOAD_LEN)
+}
+
+func modemSend(c io.ReadWriter, data []byte, packetPayloadLen int) error {
 	oBuffer := make([]byte, 1)
 
 	if _, err := c.Read(oBuffer); err != nil {
@@ -115,18 +127,18 @@ func ModemSend(c io.ReadWriter, data []byte) error {
 	}
 
 	if oBuffer[0] == POLL {
-		var blocks uint8 = uint8(len(data) / LONG_PACKET_PAYLOAD_LEN)
-		if len(data) > int(int(blocks)*int(LONG_PACKET_PAYLOAD_LEN)) {
+		var blocks int = len(data) / packetPayloadLen
+		if len(data) > blocks*packetPayloadLen {
 			blocks++
 		}
 
 		failed := 0
-		var currentBlock uint8 = 0
+		var currentBlock = 0
 		for currentBlock < blocks && failed < 10 {
-			if int(int(currentBlock+1)*int(LONG_PACKET_PAYLOAD_LEN)) > len(data) {
-				sendBlock(c, currentBlock+1, data[int(currentBlock)*int(LONG_PACKET_PAYLOAD_LEN):])
+			if int(int(currentBlock+1)*int(packetPayloadLen)) > len(data) {
+				sendBlock(c, currentBlock+1, data[currentBlock*packetPayloadLen:], packetPayloadLen)
 			} else {
-				sendBlock(c, currentBlock+1, data[int(currentBlock)*int(LONG_PACKET_PAYLOAD_LEN):(int(currentBlock)+1)*int(LONG_PACKET_PAYLOAD_LEN)])
+				sendBlock(c, currentBlock+1, data[currentBlock*packetPayloadLen:(currentBlock+1)*packetPayloadLen], packetPayloadLen)
 			}
 
 			if _, err := c.Read(oBuffer); err != nil {
